@@ -1,0 +1,186 @@
+using Unity.VisualScripting;
+using UnityEngine;
+using SE = UnityEngine.SerializeField;
+//By MigCreatesGames
+public class Player : MonoBehaviour
+{
+    [Header("Movement")]
+    [SE] private float horizontalSpeed;
+    [SE] private float forwardSpeed;
+    [SE] private float superSpeed;
+
+    [Header("Ground")]
+    public Transform groundcheck;
+    private bool isgrounded;
+    public float checkradius;
+    public LayerMask whatisGround;
+    private RaycastHit hit;
+
+    [Header("Jumps")]
+    public float jumpforce;
+    public float superJumpForce;
+    private int extrajumps;
+
+    [Header("Game Objs")]
+    public Animator animator;
+    [SE] private UIManager ui;
+    [SE] private GameObject WaterFX;
+
+    [Header("Super Speed Timer")]
+    [SE] private float startTimeSpeed;
+    private float timeSpeed;
+
+    private float horizontalInput;
+    private float verticalInput;
+    private Vector3 PlayerVelocity;
+
+    Vector3 moveDirection;
+
+    private Rigidbody rb;
+    private CapsuleCollider cp;
+
+    //Static Bools
+    public static bool gameover;
+    public static bool isSuperSpeed;
+
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        cp = GetComponent<CapsuleCollider>();
+        gameover = false;
+    }
+
+    private void Update()
+    {
+        if(!gameover)
+        {
+            Movement();
+            Jump();
+            Animation();
+            FallingPlayer();
+            TimerSuperSpeed();
+
+        }
+
+    }
+
+    public void SetSuperSpeed()
+    {
+        timeSpeed = startTimeSpeed;
+    }
+    public void Movement()
+    {
+        //Vector3 moveinput = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
+        Vector3 moveinput = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, 0f);
+        if(!isSuperSpeed)
+        {
+            rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, -forwardSpeed);
+        }
+        else
+        {
+            rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, -superSpeed);
+        }
+
+        PlayerVelocity = moveinput.normalized * -horizontalSpeed;
+    }
+    public void Jump()
+    {
+        //Jumping
+        isgrounded = Physics.SphereCast(groundcheck.position, checkradius, Vector3.down, out hit, whatisGround);
+        if(isgrounded)
+        {
+            extrajumps = 0;
+        }
+        if (Input.GetKeyDown(KeyCode.Space) && !isgrounded && extrajumps == 0)
+        {
+            if(isSuperSpeed)
+            {
+                //extrajumps++;
+                rb.AddForce(new Vector3(0f, 2.7f, 0f) * superJumpForce, ForceMode.Impulse);
+                //AudioManager.SoundClick("jumpFx");
+            }
+            else
+            {
+                //extrajumps++;
+                rb.AddForce(new Vector3(0f, 2f, 0f) * jumpforce, ForceMode.Impulse);
+                //AudioManager.SoundClick("jumpFx");
+            }
+
+        }
+    }
+    public void Animation()
+    {
+        if (isgrounded && isSuperSpeed)
+        {
+            animator.Play("PlayerSuperJump");
+        }
+        else if (isgrounded)
+        {
+            animator.Play("PlayerJump");
+        }
+        else if(!isgrounded && !isSuperSpeed)
+        {           
+            animator.Play("PlayerBalance");
+        }
+    }
+    void FixedUpdate()
+    {
+        if (!gameover)
+        {
+            rb.MovePosition(rb.position + PlayerVelocity * Time.fixedDeltaTime);
+        }
+        else
+        {
+            rb.MovePosition(rb.position);
+            WaterFX.SetActive(false);
+            rb.useGravity = false;
+            //cp.isTrigger = true;
+        }
+
+    }
+    private void OnTriggerEnter(Collider other)
+    {
+        if(other.gameObject.CompareTag(BaseString.Enemy))
+        {
+            ui.Enemyhit();
+            float randSound = Random.Range(0, 10);
+            if (randSound <= 5)
+            {
+                AudioManager.SoundClick("ouch1");
+            }
+            else
+            {
+                AudioManager.SoundClick("ouch2");
+            }
+            if (UIManager.HP <= -1)
+            {
+                GameManager gameManager = FindFirstObjectByType<GameManager>();
+                gameManager.GameOver();
+            }
+            
+        }
+    }
+    public void TimerSuperSpeed()
+    {
+        if(timeSpeed <= 0)
+        {
+            isSuperSpeed = false;
+        }
+        else
+        {
+            timeSpeed -= Time.deltaTime;
+        }
+    }
+    public void FallingPlayer()
+    {
+        if (transform.position.y < -5)
+        {
+            ui.InstantDeath();
+            gameover = true;
+            GameManager gameManager = FindFirstObjectByType<GameManager>();
+            gameManager.GameOver();
+        }
+    }
+
+
+}
